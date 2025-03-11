@@ -55,6 +55,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 
 questions = []
 count_id = 0
+messages = False
 
 class FileHandler:
     def __init__(self, filename: str, mode: str, virtual: bool = False):
@@ -302,13 +303,21 @@ class APIThroughputMonitor:
             "Authorization": f"Bearer {self.api_key}"
         }
 
-        payload = {
-            "model": self.model,
-            "stream": True,
-            "messages": [
-                {"role": "user", "content": questions[count_id % len(questions)]}
-            ]
-        }
+        global messages
+        if messages:
+            payload = {
+                "model": self.model,
+                "stream": True,
+                "messages": questions[count_id % len(questions)]
+            }
+        else:
+            payload = {
+                "model": self.model,
+                "stream": True,
+                "messages": [
+                    {"role": "user", "content": questions[count_id % len(questions)]}
+                ]
+            }
         count_id += 1
 
         try:
@@ -438,10 +447,13 @@ class APIThroughputMonitor:
                 # Force a final console update
                 live.update(self.generate_status_table())
 
-def load_dataset_as_questions(dataset_name: str, template: str):
+def load_dataset_as_questions(dataset_name: str, template: str, conversation: str):
     # I think user might want to implement a custom data loader
     dataset = load_dataset(dataset_name)['train']
-    return [template.format(**data) for data in dataset]
+    if conversation is not None:
+        return [data[conversation] for data in dataset]
+    else:
+        return [template.format(**data) for data in dataset]
 
 def main(
     model: str = "gpt-3.5-turbo",
@@ -453,13 +465,19 @@ def main(
     env: str = None,
     dataset: str = "tatsu-lab/alpaca",
     template: str = "{input}\nQuestion: {instruction}",
+    conversation: str = None,
     time_limit: int = 120
 ):
     global questions
+    global messages
     if env is not None:
         load_dotenv(env)
 
-    questions = load_dataset_as_questions(dataset, template)
+    print(template)
+
+    if conversation is not None:
+        messages = True
+    questions = load_dataset_as_questions(dataset, template, conversation)
 
     # Set default values
     if output_dir is not None and not os.path.exists(output_dir):
