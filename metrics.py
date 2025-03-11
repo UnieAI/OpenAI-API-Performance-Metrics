@@ -471,9 +471,7 @@ def main(
     global questions
     global messages
     if env is not None:
-        load_dotenv(env)
-
-    print(template)
+        load_dotenv(env)  
 
     if conversation is not None:
         messages = True
