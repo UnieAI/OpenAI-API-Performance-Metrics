@@ -238,36 +238,6 @@ class APIThroughputMonitor:
         with self.queue_lock:
             self.log_status_buffer.put(status)
 
-    def process_stream_line(self, line):
-        try:
-            # Decode the line from bytes to string if necessary
-            if isinstance(line, bytes):
-                line = line.decode('utf-8')
-
-            # Remove the "data: " prefix if it exists
-            if line.startswith('data: '):
-                line = line[6:]
-
-            # Handle stream completion marker
-            if line.strip() == '[DONE]':
-                return None
-
-            # Parse the JSON content
-            data = json.loads(line)
-
-            # Extract the content from the response structure
-            if 'choices' in data and len(data['choices']) > 0:
-                if 'delta' in data['choices'][0] and 'content' in data['choices'][0]['delta']:
-                    return data['choices'][0]['delta']['content']
-
-            return None
-        except json.JSONDecodeError:
-            logger.error("<<< JSON pasring error >>")
-            return None
-        except Exception as e:
-            logger.error(f"Error processing line: {str(e)}")
-            return None
-
     def process_stream_info(self, line):
         try:
             # Decode the line from bytes to string if necessary
@@ -344,7 +314,7 @@ class APIThroughputMonitor:
                 json=payload,
                 stream=True,
                 verify=False,
-                timeout=180
+                timeout=3600
             )
             # Record the payload and response to files
             payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", self.output_dir is None)
@@ -356,8 +326,13 @@ class APIThroughputMonitor:
 
             for line in response.iter_lines():
                 if line:
-                    data = self.process_stream_info(line)
-                    output_record.write(json.dumps(data) + "\n")
+                    try:
+                        data = self.process_stream_info(line)
+                    finally:
+                        try:
+                            output_record.write(json.dumps(data) + "\n")
+                        except:
+                            output_record.write(f"{line}\n")
                     if data is None:
                         break
                     content = data["data"]["choices"][0]["delta"]["content"]

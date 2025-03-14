@@ -23,7 +23,7 @@ P99 (second)(99% TTFT time)
 
 def mean_without_zero(arr):
     masked_arr = numpy.ma.masked_equal(arr, 0)
-    return float(masked_arr.mean()) if masked_arr.count() > 0 else 0
+    return float(masked_arr.mean()) if masked_arr.count() > 0 else float(0)
 
 
 def main(
@@ -79,7 +79,7 @@ def main(
                     if not tokens_latency:
                         if tbt_dict[idx] and type(tbt_dict[idx]) != float:
                             tbt_dict[idx] = mean_without_zero(tbt_dict[idx][1:]) # skip first token latency in each request
-                    else:
+                    elif type(tbt_dict[idx]) != float:
                         if tokens_latency[0] == status["first_token_latency"][idx]:
                             tbt_dict[idx].extend(tokens_latency[1:]) # skip first token latency in each request
                         else:
@@ -129,7 +129,10 @@ def main(
     for file in output_dir.glob("out_*.json"):
         with open(file, "r", encoding="utf-8") as file:
             for line in file:
-                response = json.loads(line)
+                try:
+                    response = json.loads(line)
+                except Exception:
+                    response = None
                 if response is None:
                     continue
                 try:
