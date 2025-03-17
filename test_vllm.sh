@@ -1,5 +1,4 @@
-#!/bin/sh
-source .env
+#!/bin/bash
 
 PARAM='--dataset="unieai/shareGPT" --conversation="conversation"'
 DATASET="shareGPT"
@@ -12,6 +11,8 @@ CONCURRENCY=${1:-512}
 TIME=${2:-120}
 PROJECT="phi"
 MODEL="gpt-3.5-turbo"
+
+source .env
 
 echo "Concurrency: $CONCURRENCY"
 echo "Time: $TIME"

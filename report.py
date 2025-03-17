@@ -29,7 +29,7 @@ def mean_without_zero(arr):
 def main(
     output_dir: str = None,
     report_dir: str = "./report",
-    tokenizer_dir: str = None,
+    tokenizer_path: str = "Qwen/Qwen2.5-0.5B-Instruct",
 ):
     # assume jsonl file is api_monitor result
     # assume json files are input and output
@@ -37,9 +37,9 @@ def main(
     output_dir = Path(output_dir)
     if output_dir is None or not output_dir.exists():
         raise ValueError(f"Output directory {output_dir} does not exist")
-    tokenizer_dir = Path(tokenizer_dir)
-    if tokenizer_dir is None or not tokenizer_dir.exists():
-        raise ValueError(f"Tokenizer directory {tokenizer_dir} does not exist")
+    tokenizer_path = Path(tokenizer_path)
+    if tokenizer_path is None:
+        raise ValueError(f"Tokenizer directory {tokenizer_path} does not exist")
     report_dir = Path(report_dir)
     report_dir.mkdir(parents=True, exist_ok=True)
     report_file = report_dir / f"{output_dir.name}.json"
@@ -106,7 +106,7 @@ def main(
     P99 = numpy.percentile(ttft_list, 99)
     TBT = mean_without_zero(tbt_list)
 
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     total_prompt_tokens = 0
     total_completion_tokens = 0
     token_completion_throughput = 0

@@ -19,4 +19,4 @@ echo "Using Tokenizer: $TOKENIZER"
 echo "Using Metrics Directory: $METRICS_DIR"
 
 # Run the command
-python report.py --tokenizer-dir="$TOKENIZER" --output-dir="$METRICS_DIR"
+python report.py --tokenizer-path="$TOKENIZER" --output-dir="$METRICS_DIR"
