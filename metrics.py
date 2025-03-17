@@ -266,7 +266,7 @@ class APIThroughputMonitor:
 
     def make_request(self):
         session_id = self.session_id
-        logger.debug("SESSION ID", session_id)
+        logger.debug(f"SESSION ID {session_id}")
         global count_id
         headers = {
             "Content-Type": "application/json",
@@ -325,29 +325,33 @@ class APIThroughputMonitor:
             payload_record.close()
 
             for line in response.iter_lines():
-                if line:
-                    try:
-                        data = self.process_stream_info(line)
-                    finally:
+                try:
+                    if line:
                         try:
-                            output_record.write(json.dumps(data) + "\n")
-                        except:
-                            output_record.write(f"{line}\n")
-                    if data is None:
-                        break
-                    content = data["data"]["choices"][0]["delta"]["content"]
+                            data = self.process_stream_info(line)
+                        finally:
+                            try:
+                                output_record.write(json.dumps(data) + "\n")
+                            except:
+                                output_record.write(f"{line}\n")
+                        if data is None:
+                            break
+                        content = data["data"]["choices"][0]["delta"]["content"]
 
-                    with self.lock:
-                        latency = round(time.time() - next_token_time, 5)
-                        self.sessions[session_id]["status"] = "Processing"
-                        self.sessions[session_id]["chunks_received"] += 1
-                        self.sessions[session_id]["total_chars"] += len(content)
-                        self.sessions[session_id]["tokens_amount"].append(len(content))
-                        self.sessions[session_id]["tokens_latency"].append(latency)
-                        if self.sessions[session_id]["ttft"] == -1:
-                            self.sessions[session_id]["ttft"] = latency
-                        next_token_time = time.time()
-
+                        with self.lock:
+                            latency = round(time.time() - next_token_time, 5)
+                            self.sessions[session_id]["status"] = "Processing"
+                            self.sessions[session_id]["chunks_received"] += 1
+                            self.sessions[session_id]["total_chars"] += len(content)
+                            self.sessions[session_id]["tokens_amount"].append(len(content))
+                            self.sessions[session_id]["tokens_latency"].append(latency)
+                            if self.sessions[session_id]["ttft"] == -1:
+                                self.sessions[session_id]["ttft"] = latency
+                            next_token_time = time.time()
+                except Exception as e:
+                    logger.debug(line)
+                    logger.error("request failed")
+                    logger.debug(e)
             output_record.close()
 
             response_time = time.time() - start_time
@@ -369,6 +373,7 @@ class APIThroughputMonitor:
                     "response_time": "N/A"
                 })
                 self.failed_requests += 1
+                logger.debug(line)
 
         finally:
             with self.lock:
