@@ -1,4 +1,5 @@
 #!/bin/sh
+source .env
 
 PARAM='--dataset="unieai/shareGPT" --conversation="conversation"'
 DATASET="shareGPT"
@@ -6,12 +7,14 @@ if [ -n "$3" ]; then
     PARAM='--dataset="unieai/longDocQA" --template="{question}"'    
     DATASET="longDocQA"
 fi
+
 CONCURRENCY=${1:-512}
 TIME=${2:-120}
+PROJECT="phi"
+MODEL="gpt-3.5-turbo"
 
 echo "Concurrency: $CONCURRENCY"
 echo "Time: $TIME"
 echo "Dataset: $DATASET"
 
-export API_KEY=sk-a4f328fa02fa11f0a28f1b1f424847fa
-python3 metrics.py $PARAM --time-limit="$TIME" --max-concurrent="$CONCURRENCY" --model=qwen_2.5_14b_vllm --api-url=https://vllm.exp.unieai.com/v1/chat/completions --output-dir="phison/vllm_${CONCURRENCY}_${TIME}_${DATASET}"
+python3 metrics.py $PARAM --time-limit="$TIME" --max-concurrent="$CONCURRENCY" --model=$MODEL --api-url=$API_URL --output-dir="$PROJECT/vllm_${CONCURRENCY}_${TIME}_${DATASET}"
