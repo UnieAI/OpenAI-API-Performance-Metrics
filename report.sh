@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Default values
-TOKENIZER_DIR="/mnt/vdc/unieai02/weight/llm/Qwen/Qwen2.5-14B-Instruct"
+TOKENIZER_DIR="tokenizer/"
 METRICS_DIR="phison/vllm_512_120_shareGPT/"
 
 # Allow command-line arguments to override defaults
