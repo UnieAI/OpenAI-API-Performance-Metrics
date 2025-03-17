@@ -264,8 +264,7 @@ class APIThroughputMonitor:
             logger.debug(f"Error processing line: {line}")
             return None
 
-    def make_request(self):
-        session_id = self.session_id
+    def make_request(self, session_id):
         logger.debug(f"SESSION ID {session_id}")
         global count_id
         headers = {
@@ -398,7 +397,7 @@ class APIThroughputMonitor:
             vertical_overflow="visible",
             auto_refresh=True
         ) as live:
-            self.session_id = 0
+            session_id = 0
             self.end_time = time.time() + self.duration
             self.write_status_thread.start()
             with ThreadPoolExecutor(max_workers=self.max_concurrent) as executor:
@@ -410,8 +409,8 @@ class APIThroughputMonitor:
                     if self.active_sessions < self.max_concurrent:
                         with self.lock:
                             self.active_sessions += 1
-                            self.session_id += 1
-                        executor.submit(self.make_request)
+                            session_id += 1
+                        executor.submit(self.make_request, session_id)
 
                     if self.should_update_display():
                         live.update(self.generate_status_table())
