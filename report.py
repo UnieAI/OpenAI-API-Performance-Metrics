@@ -104,6 +104,7 @@ def main(
     P50 = numpy.percentile(ttft_list, 50)
     P99 = numpy.percentile(ttft_list, 99)
     TBT = mean_without_zero(tbt_list)
+    failed_requests = total_requests - len(ttft_list)
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     total_prompt_tokens = 0
@@ -150,6 +151,7 @@ def main(
         "concurrency": concurrency,
         "active_sessions (max,min,avg)": [max_as, min_as, round(mean_as, 5)],
         "total_requests": total_requests,
+        "failed_requests": failed_requests,
         "elapsed_time_seconds": round(elapsed_time, 5),
         "total_prompt_tokens": total_prompt_tokens,
         "total_completion_tokens": total_completion_tokens,
@@ -169,6 +171,7 @@ def main(
     print(f"concurrency: {concurrency}")
     print(f"active_sessions (max,min,avg): {max_as}, {min_as}, {mean_as:.5f}")
     print(f"total requests: {total_requests}")
+    print(f"failed requests: {failed_requests}")
     print(f"elapsed time (second): {elapsed_time:.5f}")
     print(f"total prompt tokens: {total_prompt_tokens}")
     print(f"total completion tokens: {total_completion_tokens}")
