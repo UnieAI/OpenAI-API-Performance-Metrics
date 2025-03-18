@@ -35,9 +35,9 @@ def process_stream_line(line):
         return None
 
 def make_chat_request(prompt):
-    base_url = "https://www.familymart.unieai.com:8088"
+    base_url = "https://api.openai.com/v1/chat/completions"
     api_url = f"{base_url}/api/chat/completions"
-    api_key = "sk-36944186ace74c55bdd98a70229dfc83"
+    api_key = "sk-exampleapikey"
 
     headers = {
         "Content-Type": "application/json",
