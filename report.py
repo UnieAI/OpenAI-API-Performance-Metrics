@@ -58,7 +58,7 @@ def main(
     ttft_list = []
     ts_list1 = []
     ts_list2 = []
-    total_requests = 0
+    total_requests = sum(1 for file in output_dir.glob("in_*.json"))
     tbt_dict = defaultdict(list)
 
     for file in output_dir.glob("*.jsonl"):
@@ -74,7 +74,6 @@ def main(
                 ts_list1.append(t1)
                 ts_list2.append(t2)
                 concurrency = int(max(concurrency, status["concurrency"]))
-                total_requests = int(max(total_requests, status["total_sessions"]))
                 for idx, tokens_latency in enumerate(status["tokens_latency"]):
                     if not tokens_latency:
                         if tbt_dict[idx] and type(tbt_dict[idx]) != float:
@@ -150,7 +149,7 @@ def main(
     report_data = {
         "concurrency": concurrency,
         "active_sessions (max,min,avg)": [max_as, min_as, round(mean_as, 5)],
-        "total_requests": len(ttft_list),
+        "total_requests": total_requests,
         "elapsed_time_seconds": round(elapsed_time, 5),
         "total_prompt_tokens": total_prompt_tokens,
         "total_completion_tokens": total_completion_tokens,
@@ -169,7 +168,7 @@ def main(
     print(f"Results saved to {report_file}:")
     print(f"concurrency: {concurrency}")
     print(f"active_sessions (max,min,avg): {max_as}, {min_as}, {mean_as:.5f}")
-    print(f"total requests: {len(ttft_list)}")
+    print(f"total requests: {total_requests}")
     print(f"elapsed time (second): {elapsed_time:.5f}")
     print(f"total prompt tokens: {total_prompt_tokens}")
     print(f"total completion tokens: {total_completion_tokens}")
