@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import requests
 import threading
 import time
@@ -13,11 +16,17 @@ from queue import Queue
 import math
 from urllib3.exceptions import InsecureRequestWarning
 import urllib3
-import os
 from dotenv import load_dotenv
 import uuid
 from datasets import load_dataset
 import logging
+from pathlib import Path
+import numpy
+from collections import defaultdict
+from transformers import AutoTokenizer
+from report import generate_report
+import warnings
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 load_dotenv()
 
@@ -77,7 +86,7 @@ class FileHandler:
         self.close()
 
 class APIThroughputMonitor:
-    def __init__(self, model: str, api_url: str, api_key: str, max_concurrent: int = 5, columns: int = 3, log_file: str = "api_monitor.jsonl", output_dir: str = None):
+    def __init__(self, model: str, api_url: str, api_key: str, max_concurrent: int = 5, columns: int = 3, log_file: str = "api_monitor.jsonl", output_dir: str = None, quiet: bool = False):
         self.model = model
         self.api_url = api_url
         self.api_key = api_key
@@ -97,6 +106,7 @@ class APIThroughputMonitor:
         self.last_update_time = self.start_time
         self.update_interval = 0.25  # Screen update interval in seconds
         self.output_dir = output_dir
+        self.quiet = quiet
         self.queue_lock = threading.Lock()
         self.log_status_buffer = Queue() # log to file is slow, keep in memory and save later
         self.write_status_event = threading.Event()
@@ -123,6 +133,17 @@ class APIThroughputMonitor:
         )
 
     def generate_status_table(self):
+        if self.quiet:
+            table = Table(box=box.ROUNDED)
+            table.add_column("Sent", justify="left", style="bold cyan")
+            table.add_column("Done", justify="center", style="bold yellow")
+            table.add_column("Fail", justify="right", style="bold green")
+            sent = self.total_requests
+            done = self.successful_requests
+            fail = self.failed_requests
+            table.add_row(f"{sent}", f"{done}", f"{fail}")
+            return table
+
         table = Table(
             title="API Throughput Monitor",
             box=box.ROUNDED,
@@ -426,6 +447,11 @@ class APIThroughputMonitor:
                 # Force a final console update
                 live.update(self.generate_status_table())
 
+        try:
+            generate_report(self.output_dir, quiet=self.quiet)
+        except Exception as e:
+            logger.error(f"Error generating report: {str(e)}")
+
 def load_dataset_as_questions(dataset_name: str, template: str, conversation: str):
     # I think user might want to implement a custom data loader
     dataset = load_dataset(dataset_name)['train']
@@ -445,12 +471,13 @@ def main(
     dataset: str = "tatsu-lab/alpaca",
     template: str = "{input}\nQuestion: {instruction}",
     conversation: str = None,
-    time_limit: int = 120
+    time_limit: int = 120,
+    quiet: bool = False,
 ):
     global questions
     global messages
     if env is not None:
-        load_dotenv(env)  
+        load_dotenv(env)
 
     if conversation is not None:
         messages = True
@@ -481,6 +508,7 @@ def main(
         columns=columns,
         log_file=log_file,
         output_dir=output_dir,
+        quiet=quiet,
     )
 
     logger.info("🚀 Starting API Throughput Monitor...")

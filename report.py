@@ -26,10 +26,11 @@ def mean_without_zero(arr):
     return float(masked_arr.mean()) if masked_arr.count() > 0 else float(0)
 
 
-def main(
+def generate_report(
     output_dir: str = None,
     report_dir: str = "./report",
     tokenizer_path: str = "Qwen/Qwen2.5-0.5B-Instruct",
+    quiet: bool = False,
 ):
     # assume jsonl file is api_monitor result
     # assume json files are input and output
@@ -158,32 +159,34 @@ def main(
         "completion_throughput": round(token_completion_throughput, 5),
         "token_throughput": round(token_throughput, 5),
         "RPS": round(RPS, 5),
-        "TTFT_seconds": round(TTFT, 5),
-        "P99_seconds": round(P99, 5),
-        "P50_seconds": round(P50, 5),
-        "TBT_seconds": round(TBT, 5),
+        "TTFT": round(TTFT, 5),
+        "P99": round(P99, 5),
+        "P50": round(P50, 5),
+        "token_latency": round(TBT, 5),
     }
     with open(report_file, "a+") as f:
         json.dump(report_data, f, indent=4)
         f.write("\n")
 
-    print(f"Results saved to {report_file}:")
-    print(f"concurrency: {concurrency}")
-    print(f"active_sessions (max,min,avg): {max_as}, {min_as}, {mean_as:.5f}")
-    print(f"total requests: {total_requests}")
-    print(f"failed requests: {failed_requests}")
-    print(f"elapsed time (second): {elapsed_time:.5f}")
-    print(f"total prompt tokens: {total_prompt_tokens}")
-    print(f"total completion tokens: {total_completion_tokens}")
-    print(f"token throughput (completion tokens / second): {token_completion_throughput:.5f}")
-    print(f"token throughput (prompt+completion tokens / second): {token_throughput:.5f}")
-    print(f"RPS: {RPS:.5f}")
-    print(f"TTFT (second): {TTFT:.5f}")
-    print(f"P99 (second): {P99:.5f}")
-    print(f"P50 (second): {P50:.5f}")
-    print(f"TBT (second): {TBT:.5f}")
-
+    if quiet:
+        print(f"{report_data}")
+    else:
+        print(f"Results saved to {report_file}:")
+        print(f"concurrency: {concurrency}")
+        print(f"active_sessions (max,min,avg): {max_as}, {min_as}, {mean_as:.5f}")
+        print(f"total requests: {total_requests}")
+        print(f"failed requests: {failed_requests}")
+        print(f"elapsed time (second): {elapsed_time:.5f}")
+        print(f"total prompt tokens: {total_prompt_tokens}")
+        print(f"total completion tokens: {total_completion_tokens}")
+        print(f"token throughput (completion tokens / second): {token_completion_throughput:.5f}")
+        print(f"token throughput (prompt+completion tokens / second): {token_throughput:.5f}")
+        print(f"RPS: {RPS:.5f}")
+        print(f"TTFT (second): {TTFT:.5f}")
+        print(f"P99 (second): {P99:.5f}")
+        print(f"P50 (second): {P50:.5f}")
+        print(f"TBT (second): {TBT:.5f}")
 
 if __name__ == "__main__":
     import fire
-    fire.Fire(main)
+    fire.Fire(generate_report)
