@@ -447,11 +447,6 @@ class APIThroughputMonitor:
                 # Force a final console update
                 live.update(self.generate_status_table())
 
-        try:
-            generate_report(self.output_dir, quiet=self.quiet)
-        except Exception as e:
-            logger.error(f"Error generating report: {str(e)}")
-
 def load_dataset_as_questions(dataset_name: str, template: str, conversation: str):
     # I think user might want to implement a custom data loader
     dataset = load_dataset(dataset_name)['train']
@@ -521,6 +516,13 @@ def main(
     finally:
         logger.info("\n✨ Monitor stopped. Final statistics displayed above.")
         logger.info(f"Log file saved as: {monitor.log_file}")
+
+    try:
+        logger.info(f"generating report...")
+        generate_report(output_dir, quiet=quiet)
+    except Exception as e:
+        logger.error(f"generating report: {str(e)}")
+
 
 if __name__ == "__main__":
     import fire
