@@ -279,11 +279,11 @@ class APIThroughputMonitor:
         except json.JSONDecodeError:
             logger.error("<<< JSON pasring error >>")
             logger.debug(f"Error processing line: {line}")
-            return None
+            return {}
         except Exception as e:
             logger.error(f"Error processing line: {str(e)}")
             logger.debug(f"Error processing line: {line}")
-            return None
+            return {}
 
     def make_request(self, session_id):
         logger.debug(f"SESSION ID {session_id}")
@@ -356,7 +356,12 @@ class APIThroughputMonitor:
                                 output_record.write(f"{line}\n")
                         if data is None:
                             break
-                        content = data["data"]["choices"][0]["delta"]["content"]
+                        if not data:
+                            continue
+                        try:
+                            content = data["data"]["choices"][0]["delta"]["content"]
+                        except:
+                            continue
 
                         with self.lock:
                             latency = round(time.time() - next_token_time, 5)
