@@ -1,3 +1,6 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import requests
 import threading
 import time
@@ -13,13 +16,17 @@ from queue import Queue
 import math
 from urllib3.exceptions import InsecureRequestWarning
 import urllib3
-import os
 from dotenv import load_dotenv
 import uuid
-
 from datasets import load_dataset
-
 import logging
+from pathlib import Path
+import numpy
+from collections import defaultdict
+from transformers import AutoTokenizer
+from report import generate_report
+import warnings
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 load_dotenv()
 
@@ -57,6 +64,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 
 questions = []
 count_id = 0
+messages = False
 
 class FileHandler:
     def __init__(self, filename: str, mode: str, virtual: bool = False):
@@ -78,7 +86,7 @@ class FileHandler:
         self.close()
 
 class APIThroughputMonitor:
-    def __init__(self, model: str, api_url: str, api_key: str, max_concurrent: int = 5, columns: int = 3, log_file: str = "api_monitor.jsonl", output_dir: str = None):
+    def __init__(self, model: str, api_url: str, api_key: str, max_concurrent: int = 5, columns: int = 3, log_file: str = "api_monitor.jsonl", output_dir: str = None, quiet: bool = False):
         self.model = model
         self.api_url = api_url
         self.api_key = api_key
@@ -98,7 +106,12 @@ class APIThroughputMonitor:
         self.last_update_time = self.start_time
         self.update_interval = 0.25  # Screen update interval in seconds
         self.output_dir = output_dir
-        
+        self.quiet = quiet
+        self.queue_lock = threading.Lock()
+        self.log_status_buffer = Queue() # log to file is slow, keep in memory and save later
+        self.write_status_event = threading.Event()
+        self.write_status_thread = threading.Thread(target=self.write_status, daemon=True)
+
         # Initialize log file
         with open(self.log_file, 'w') as f:
             f.write('')
@@ -120,6 +133,17 @@ class APIThroughputMonitor:
         )
 
     def generate_status_table(self):
+        if self.quiet:
+            table = Table(box=box.ROUNDED)
+            table.add_column("Sent", justify="left", style="bold cyan")
+            table.add_column("Done", justify="center", style="bold yellow")
+            table.add_column("Fail", justify="right", style="bold green")
+            sent = self.total_requests
+            done = self.successful_requests
+            fail = self.failed_requests
+            table.add_row(f"{sent}", f"{done}", f"{fail}")
+            return table
+
         table = Table(
             title="API Throughput Monitor",
             box=box.ROUNDED,
@@ -132,9 +156,13 @@ class APIThroughputMonitor:
 
         with self.lock:
             sorted_sessions = sorted(self.sessions.items(), key=lambda x: int(x[0]))
+            # filter session status
+            sorted_sessions = [(session_id, info)
+                for (session_id, info) in sorted_sessions
+                if info["status"] in ("Starting", "Processing")]
             num_sessions = len(sorted_sessions)
             num_rows = math.ceil(num_sessions / self.columns)
-            
+
             for row_idx in range(num_rows):
                 row_data = []
                 for col_idx in range(self.columns):
@@ -150,35 +178,61 @@ class APIThroughputMonitor:
             total_chars = sum(s["total_chars"] for s in self.sessions.values())
             total_chunks = sum(s["chunks_received"] for s in self.sessions.values())
             chars_per_sec = total_chars / elapsed_time if elapsed_time > 0 else 0
-            
-            table.add_section()
-            stats_summary = (
-                f"[bold cyan]Summary Stats:[/bold cyan]\n"
-                f"Time: {elapsed_time:.1f}s \n"
-                f"Active: {self.active_sessions} | "
-                f"Total: {self.total_requests} | "
-                f"Success: {self.successful_requests} | "
-                f"Failed: {self.failed_requests}\n"
-                f"Chars/s: {chars_per_sec:.1f} | "
-                f"Total Chars: {total_chars} | "
-                f"Total Chunks: {total_chunks}"
-            )
-            table.add_row(stats_summary)
+
+        table.add_section()
+        stats_summary = (
+            f"[bold cyan]Summary Stats:[/bold cyan]\n"
+            f"Time: {elapsed_time:.1f}s \n"
+            f"Concurrency: {self.max_concurrent}\n"
+            f"Active: {self.active_sessions} | "
+            f"Total: {self.total_requests} | "
+            f"Success: {self.successful_requests} | "
+            f"Failed: {self.failed_requests}\n"
+            f"Chars/s: {chars_per_sec:.1f} | "
+            f"Total Chars: {total_chars} | "
+            f"Total Chunks: {total_chunks}"
+        )
+        table.add_row(stats_summary)
 
         return table
+
+    def write_status_to_file(self, status_list):
+        with open(self.log_file, 'a') as f:
+            for status in status_list:
+                f.write(json.dumps(status) + '\n')
+
+    def write_status(self):
+        while not self.write_status_event.is_set():
+            status_list = []
+            with self.queue_lock:
+                for _ in range(3600):
+                    try:
+                        status_list.append(self.log_status_buffer.get(block=False))
+                    except:
+                        break
+            self.write_status_to_file(status_list)
+            time.sleep(1)
+
+        status_list = []
+        with self.queue_lock:
+            while not self.log_status_buffer.empty():
+                status_list.append(self.log_status_buffer.get(block=False))
+        self.write_status_to_file(status_list)
 
     def log_status(self):
         current_time = time.time()
         elapsed = current_time - self.start_time
-        
+
         with self.lock:
             total_chars = sum(session["total_chars"] for session in self.sessions.values())
             chars_per_second = (total_chars - self.prev_total_chars) / (current_time - self.last_log_time)
             active_sessions = len([s for s in self.sessions.values() if s["status"] in ["Starting", "Processing"]])
             completed_sessions = len([s for s in self.sessions.values() if s["status"] == "Completed"])
 
+            ttft = [ self.sessions[id]['ttft'] for id in self.sessions ]
             tokens_latency = [ self.sessions[id]['tokens_latency'] for id in self.sessions ]
             tokens_amount = [ self.sessions[id]['tokens_amount'] for id in self.sessions ]
+
             for id in self.sessions:
                 self.sessions[id]['tokens_latency'] = []
                 self.sessions[id]['tokens_amount'] = []
@@ -193,45 +247,17 @@ class APIThroughputMonitor:
                 "total_sessions": len(self.sessions),
                 "successful_requests": self.successful_requests,
                 "failed_requests": self.failed_requests,
+                "first_token_latency": ttft,
                 "tokens_latency": tokens_latency,
                 "tokens_amount": tokens_amount,
+                "concurrency": self.max_concurrent,
             }
-            
-            with open(self.log_file, 'a') as f:
-                f.write(json.dumps(status) + '\n')
-            
+
             self.prev_total_chars = total_chars
             self.last_log_time = current_time
 
-    def process_stream_line(self, line):
-        try:
-            # Decode the line from bytes to string if necessary
-            if isinstance(line, bytes):
-                line = line.decode('utf-8')
-
-            # Remove the "data: " prefix if it exists
-            if line.startswith('data: '):
-                line = line[6:]
-
-            # Handle stream completion marker
-            if line.strip() == '[DONE]':
-                return None
-
-            # Parse the JSON content
-            data = json.loads(line)
-            
-            # Extract the content from the response structure
-            if 'choices' in data and len(data['choices']) > 0:
-                if 'delta' in data['choices'][0] and 'content' in data['choices'][0]['delta']:
-                    return data['choices'][0]['delta']['content']
-
-            return None
-        except json.JSONDecodeError:
-            logger.error("<<< JSON pasring error >>")
-            return None
-        except Exception as e:
-            logger.error(f"Error processing line: {str(e)}")
-            return None
+        with self.queue_lock:
+            self.log_status_buffer.put(status)
 
     def process_stream_info(self, line):
         try:
@@ -253,11 +279,11 @@ class APIThroughputMonitor:
         except json.JSONDecodeError:
             logger.error("<<< JSON pasring error >>")
             logger.debug(f"Error processing line: {line}")
-            return None
+            return {}
         except Exception as e:
             logger.error(f"Error processing line: {str(e)}")
             logger.debug(f"Error processing line: {line}")
-            return None
+            return {}
 
     def make_request(self, session_id):
         logger.debug(f"SESSION ID {session_id}")
@@ -266,14 +292,22 @@ class APIThroughputMonitor:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
-        
-        payload = {
-            "model": self.model,
-            "stream": True,
-            "messages": [
-                {"role": "user", "content": questions[count_id % len(questions)]}
-            ]
-        }
+
+        global messages
+        if messages:
+            payload = {
+                "model": self.model,
+                "stream": True,
+                "messages": questions[count_id % len(questions)]
+            }
+        else:
+            payload = {
+                "model": self.model,
+                "stream": True,
+                "messages": [
+                    {"role": "user", "content": questions[count_id % len(questions)]}
+                ]
+            }
         count_id += 1
 
         try:
@@ -285,6 +319,7 @@ class APIThroughputMonitor:
                     "error": None,
                     "total_chars": 0,
                     "chunks_received": 0,
+                    "ttft": -1,
                     "tokens_latency": [],
                     "tokens_amount": [],
                 }
@@ -299,7 +334,7 @@ class APIThroughputMonitor:
                 json=payload,
                 stream=True,
                 verify=False,
-                timeout=180
+                timeout=3600
             )
             # Record the payload and response to files
             payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", self.output_dir is None)
@@ -310,24 +345,42 @@ class APIThroughputMonitor:
             payload_record.close()
 
             for line in response.iter_lines():
-                if line:
-                    data = self.process_stream_info(line)
-                    output_record.write(json.dumps(data) + "\n")
-                    if data is None:
-                        break
-                    content = data["data"]["choices"][0]["delta"]["content"]
-                    with self.lock:
-                        self.sessions[session_id]["status"] = "Processing"
-                        self.sessions[session_id]["chunks_received"] += 1
-                        self.sessions[session_id]["total_chars"] += len(content)
-                        self.sessions[session_id]["tokens_amount"].append(len(content))
-                        self.sessions[session_id]["tokens_latency"].append(round(time.time() - next_token_time, 5))
-                        next_token_time = time.time()
+                try:
+                    if line:
+                        try:
+                            data = self.process_stream_info(line)
+                        finally:
+                            try:
+                                output_record.write(json.dumps(data) + "\n")
+                            except:
+                                output_record.write(f"{line}\n")
+                        if data is None:
+                            break
+                        if not data:
+                            continue
+                        try:
+                            content = data["data"]["choices"][0]["delta"]["content"]
+                        except:
+                            continue
 
+                        with self.lock:
+                            latency = round(time.time() - next_token_time, 5)
+                            self.sessions[session_id]["status"] = "Processing"
+                            self.sessions[session_id]["chunks_received"] += 1
+                            self.sessions[session_id]["total_chars"] += len(content)
+                            self.sessions[session_id]["tokens_amount"].append(len(content))
+                            self.sessions[session_id]["tokens_latency"].append(latency)
+                            if self.sessions[session_id]["ttft"] == -1:
+                                self.sessions[session_id]["ttft"] = latency
+                            next_token_time = time.time()
+                except Exception as e:
+                    logger.debug(line)
+                    logger.error("request failed")
+                    logger.debug(e)
             output_record.close()
 
             response_time = time.time() - start_time
-            
+
             with self.lock:
                 self.sessions[session_id].update({
                     "status": "Completed",
@@ -345,6 +398,7 @@ class APIThroughputMonitor:
                     "response_time": "N/A"
                 })
                 self.failed_requests += 1
+                logger.debug(line)
 
         finally:
             with self.lock:
@@ -369,32 +423,42 @@ class APIThroughputMonitor:
             vertical_overflow="visible",
             auto_refresh=True
         ) as live:
+            session_id = 0
+            self.end_time = time.time() + self.duration
+            self.write_status_thread.start()
             with ThreadPoolExecutor(max_workers=self.max_concurrent) as executor:
-                end_time = time.time() + duration
-                session_id = 0
-                last_display_update = time.time()
-
-                while time.time() < end_time:
+                while time.time() < self.end_time:
                     current_time = time.time()
-                    
                     if current_time - self.last_log_time >= 1.0:
                         self.log_status()
-                    
+
                     if self.active_sessions < self.max_concurrent:
                         with self.lock:
                             self.active_sessions += 1
-                        session_id += 1
+                            session_id += 1
                         executor.submit(self.make_request, session_id)
-                    
+
                     if self.should_update_display():
                         live.update(self.generate_status_table())
-                    
+
                     time.sleep(0.1)
 
-def load_dataset_as_questions(dataset_name: str, template: str):
+                # Ensure all threads finish before exiting
+                executor.shutdown(wait=True)
+                # Force a final log update
+                self.log_status()
+                self.write_status_event.set()
+                self.write_status_thread.join()
+                # Force a final console update
+                live.update(self.generate_status_table())
+
+def load_dataset_as_questions(dataset_name: str, template: str, conversation: str):
     # I think user might want to implement a custom data loader
     dataset = load_dataset(dataset_name)['train']
-    return [template.format(**data) for data in dataset]
+    if conversation is not None:
+        return [data[conversation] for data in dataset]
+    else:
+        return [template.format(**data) for data in dataset]
 
 def main(
     model: str = "gpt-3.5-turbo",
@@ -406,13 +470,18 @@ def main(
     env: str = None,
     dataset: str = "tatsu-lab/alpaca",
     template: str = "{input}\nQuestion: {instruction}",
-    time_limit: int = 120
+    conversation: str = None,
+    time_limit: int = 120,
+    quiet: bool = False,
 ):
     global questions
+    global messages
     if env is not None:
         load_dotenv(env)
 
-    questions = load_dataset_as_questions(dataset, template)
+    if conversation is not None:
+        messages = True
+    questions = load_dataset_as_questions(dataset, template, conversation)
 
     # Set default values
     if output_dir is not None and not os.path.exists(output_dir):
@@ -439,11 +508,12 @@ def main(
         columns=columns,
         log_file=log_file,
         output_dir=output_dir,
+        quiet=quiet,
     )
-    
+
     logger.info("🚀 Starting API Throughput Monitor...")
     logger.info("Press Ctrl+C to stop the monitor\n")
-    
+
     try:
         monitor.run(duration=time_limit)
     except KeyboardInterrupt:
@@ -451,6 +521,13 @@ def main(
     finally:
         logger.info("\n✨ Monitor stopped. Final statistics displayed above.")
         logger.info(f"Log file saved as: {monitor.log_file}")
+
+    try:
+        logger.info(f"generating report...")
+        generate_report(output_dir, quiet=quiet)
+    except Exception as e:
+        logger.error(f"generating report: {str(e)}")
+
 
 if __name__ == "__main__":
     import fire
