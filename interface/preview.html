@@ -486,7 +486,7 @@
 
     <script>
         // WebSocket integration for preview.html frontend
-        const wsUrl = 'ws://localhost:8765';
+        const wsUrl = `ws://${location.host}/ws`;
         let ws;
         const sessions = {};
         
