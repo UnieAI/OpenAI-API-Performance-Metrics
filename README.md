@@ -80,9 +80,11 @@ llm-metrics-lab  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+
 ## 1.1 Configuration
 In the web interface, the Configuration section allows you to fill in required variables.
 For details on the expected input formats and variable definitions, please refer to **2.1 Metrics Script (`metrics.py`)**.
+![configuration](https://github.com/user-attachments/assets/b43e06e4-3c6e-4cec-916c-151dfcb9813a)
 
 ## 1.2 Log Output
 This section displays the runtime status of the system, including events such as Start Monitoring, Stop Monitoring, and Receive output files. It provides real-time feedback on monitoring operations.
+![log_output](https://github.com/user-attachments/assets/6232ad81-5d4f-4066-ab6b-572575062e38)
 
 ## 1.3 Output File
 This section provides download links for two result files:
@@ -90,9 +92,11 @@ This section provides download links for two result files:
 - `api_metrics_<current_time>.png`: Visual summary of the evaluation
 
 For quick reference, the PNG file is also rendered directly within this section.
+![output_file](https://github.com/user-attachments/assets/f8f21e8e-e172-41ba-ac36-eb3f7d3e1925)
 
 ## 1.4 Monitoring Dashboard
 This area visualizes the monitoring process as tasks are executed.
+![monitoring_dashboard](https://github.com/user-attachments/assets/078b2a37-2550-4911-8132-5ee2a5e4e368)
 
 
 ## 2. 🧪 Run via Python Scripts
