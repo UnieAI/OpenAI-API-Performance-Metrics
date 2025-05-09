@@ -13,7 +13,6 @@ from config.settings import (
     LOG_FILE_DIR,
     STATIC_DIR,
     HOST,
-    WS_PORT,
     HTTP_PORT,
 )
 

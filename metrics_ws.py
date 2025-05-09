@@ -2,6 +2,7 @@ import asyncio
 import time
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import time
 from rich.live import Live
 from rich.table import Table
@@ -519,8 +520,12 @@ async def websocket_handler(websocket: WebSocket):
                     columns = int(params.get('columns', 3))
                     # log_file = params.get('log_file', "api_monitor.jsonl")
                     # plot_file = params.get('plot_file', "api_metrics.png")
-                    log_file = f"{runtime_uuid}.jsonl"
-                    plot_file = f"{runtime_uuid}.png"
+                    # log_file = f"{runtime_uuid}.jsonl"
+                    # plot_file = f"{runtime_uuid}.png"
+                    taipei_time = datetime.now(ZoneInfo("Asia/Taipei"))
+                    current_time = taipei_time.strftime("%Y%m%d_%H%M%S")
+                    log_file = f"api_monitor_{current_time}.json"
+                    plot_file = f"api_metrics_{current_time}.png"
                     # output_dir = params.get('output_dir') # Dangerous, this might cause security issues like overwriting files or directories discovery
                     time_limit = int(params.get('time_limit', 10))
                     dataset_name = params.get('dataset', "tatsu-lab/alpaca") # Dangours, use with caution
