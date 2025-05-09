@@ -10,6 +10,7 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f8f9fa;
+            padding-top: 60px;
             padding-bottom: 60px;
         }
         .card {
@@ -486,7 +487,8 @@
 
     <script>
         // WebSocket integration for preview.html frontend
-        const wsUrl = 'ws://localhost:8765';
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${location.host}/ws`;
         let ws;
         const sessions = {};
         
