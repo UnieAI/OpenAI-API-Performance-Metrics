@@ -46,7 +46,6 @@ async def startup():
 
 # Activate FastAPI server
 if __name__ == "__main__":
-    logger.info("🐱START")
     config = uvicorn.Config(app, host=HOST, port=HTTP_PORT, log_level="info")
     server = uvicorn.Server(config)
     asyncio.run(server.serve())

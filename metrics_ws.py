@@ -277,7 +277,6 @@ class APIThroughputMonitor:
 
             # Remove the "data: " prefix if it exists
             data_key = 'data: '
-            logger.debug(f"Line: {line}")
             if line.startswith(data_key):
                 line = line[len(data_key):]
 
@@ -304,7 +303,6 @@ class APIThroughputMonitor:
             "Authorization": f"Bearer {self.api_key}"
         }
         messages = questions[session_id % len(questions)]
-        logger.debug(f"MESSAGE: {messages}")
         payload = {
             "model": self.model,
             "stream": True,
@@ -332,7 +330,7 @@ class APIThroughputMonitor:
             # Make request with SSL verification disabled
             async with httpx.AsyncClient(verify=False, timeout=180.0) as client:
                 async with client.stream("POST", f"{self.api_url}/chat/completions", headers=headers, json=payload) as response:
-                    logger.debug(f"RESPONSE STATUS: {response.status_code}")
+                    # logger.debug(f"RESPONSE STATUS: {response.status_code}")
                     payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", True)
                     output_record = FileHandler(f"{self.output_dir}/out_{runtime_uuid}_{session_id}.json", "w", True)
 
@@ -524,7 +522,7 @@ async def websocket_handler(websocket: WebSocket):
                     # plot_file = f"{runtime_uuid}.png"
                     taipei_time = datetime.now(ZoneInfo("Asia/Taipei"))
                     current_time = taipei_time.strftime("%Y%m%d_%H%M%S")
-                    log_file = f"api_monitor_{current_time}.json"
+                    log_file = f"api_monitor_{current_time}.jsonl"
                     plot_file = f"api_metrics_{current_time}.png"
                     # output_dir = params.get('output_dir') # Dangerous, this might cause security issues like overwriting files or directories discovery
                     time_limit = int(params.get('time_limit', 10))
@@ -568,7 +566,7 @@ async def websocket_handler(websocket: WebSocket):
                     # Start the monitor
                     logger.info("🚀 Starting API Throughput Monitor...")
                     await websocket.send_text(json.dumps({"status": "started", "message": "Monitor started"}))
-                    logger.info("SEND")
+                    # logger.info("SEND")
                     # Run the monitor in the background
                     monitor_task = asyncio.create_task(monitor.run(websocket, duration=time_limit))
 
