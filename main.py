@@ -3,6 +3,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import uvicorn
 import websockets
 
@@ -20,7 +21,21 @@ from config.settings import (
 logger = setup_logger(__name__)
 
 # --- FastAPI app ---
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🌱 Starting lifespan and background monitor_cleaner")
+    task = asyncio.create_task(monitor_cleaner())
+    try:
+        yield
+    finally:
+        logger.info("🛑 Shutting down, cancelling monitor_cleaner")
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.info("✅ monitor_cleaner cancelled successfully")
+
+app = FastAPI(lifespan=lifespan)
 
 try:
     os.makedirs(LOG_FILE_DIR, exist_ok=True)
@@ -40,9 +55,9 @@ async def get_index():
 async def websocket_route(websocket: WebSocket):
     await websocket_handler(websocket)
     
-@app.on_event("startup")
-async def startup():
-    asyncio.create_task(monitor_cleaner())
+# @app.on_event("startup")
+# async def startup():
+#     asyncio.create_task(monitor_cleaner())
 
 # Activate FastAPI server
 if __name__ == "__main__":

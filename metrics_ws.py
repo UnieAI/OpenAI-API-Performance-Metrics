@@ -25,6 +25,7 @@ from pathlib import Path
 
 from config.settings import (
     LOG_FILE_DIR,
+    PROXY,
 )
 from visualize import APIMetricsVisualizer
 
@@ -328,7 +329,7 @@ class APIThroughputMonitor:
             next_token_time = start_time
             
             # Make request with SSL verification disabled
-            async with httpx.AsyncClient(verify=False, timeout=180.0) as client:
+            async with httpx.AsyncClient(verify=False, timeout=180.0, proxy=PROXY) as client:
                 async with client.stream("POST", f"{self.api_url}/chat/completions", headers=headers, json=payload) as response:
                     # logger.debug(f"RESPONSE STATUS: {response.status_code}")
                     payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", True)
@@ -339,6 +340,7 @@ class APIThroughputMonitor:
 
                     async for line in response.aiter_lines():
                         if line:
+                            # logger.info(f"Line: {line}")
                             data = self.process_stream_info(line)
                             if data is None:
                                 break
@@ -451,7 +453,7 @@ class APIThroughputMonitor:
                 self.running = False
                 self._stop_requested = False
                 logger.info("🛑 run() has ended (timeout or stopped).")
-                logger.info(f"File Path: {file_info}")
+                # logger.info(f"File Path: {file_info}")
 
     async def stop_monitor(self):
         self.running = False
@@ -597,32 +599,37 @@ async def websocket_handler(websocket: WebSocket):
     finally:
         connected_clients.discard(websocket)
         logger.info("Monitor Task Done (after disconnect or error)")
-        
+
+"""Background task to clean up monitor after it finishes"""     
 async def monitor_cleaner():
-    """Background task to clean up monitor after it finishes"""
-    global monitor, monitor_task, count_id, connected_clients
-    client_ip = websocket.client.host
-    client_port = websocket.client.port
-    while True:
-        if monitor_task is not None and monitor_task.done():
-            monitor = None
-            monitor_task = None
-            count_id = 0
-            logger.info("✅ Monitor task finished, cleaning up")
-            
-            # Send completion message to all connected clients
-            for websocket in connected_clients:
-                try:
-                    completion_message = {
-                        "status": "completed",
-                        "message": "Benchmark run finished"
-                    }
-                    await websocket.send_text(json.dumps(completion_message))
-                    logger.info(f"📡 Sent completion message to {client_ip}:{client_port}")
-                except Exception as e:
-                    logger.error(f"Error sending message to {client_ip}:{client_port}: {str(e)}")
-                    
-        await asyncio.sleep(0.5)
+    try: 
+        global monitor, monitor_task, count_id, connected_clients
+
+        while True:
+            if monitor_task is not None and monitor_task.done():
+                monitor = None
+                monitor_task = None
+                count_id = 0
+                logger.info("✅ Monitor task finished, cleaning up")
+                
+                # Send completion message to all connected clients
+                for websocket in connected_clients:
+                    try:
+                        client_ip = websocket.client.host
+                        client_port = websocket.client.port
+                        completion_message = {
+                            "status": "completed",
+                            "message": "Benchmark run finished"
+                        }
+                        await websocket.send_text(json.dumps(completion_message))
+                        logger.info(f"📡 Sent completion message to {client_ip}:{client_port}")
+                    except Exception as e:
+                        logger.error(f"Error sending message to {client_ip}:{client_port}: {str(e)}")
+                        
+            await asyncio.sleep(0.5)
+    except Exception as e:
+        logger.exception("❌ monitor_cleaner 發生未預期錯誤：", exc_info=e)
+
         
 def generate_visualization(log_file, plot_file):
     visualizer = APIMetricsVisualizer(log_file)

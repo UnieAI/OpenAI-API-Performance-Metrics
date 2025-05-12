@@ -10,3 +10,5 @@ LOG_FILE_DIR = Path(os.getenv("LOG_FILE_DIR", '.outputs')).resolve()
 
 HOST = os.getenv("HOST", "0.0.0.0")
 HTTP_PORT = int(os.getenv("HTTP_PORT", 8000))
+
+PROXY = os.getenv("PROXY", None)
