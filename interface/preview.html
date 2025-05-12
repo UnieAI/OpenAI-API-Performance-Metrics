@@ -1178,13 +1178,19 @@
         // updateFileSection('example.txt', '/downloads/example.txt');
         // updateFileSection('example2.txt', '/downloads/example.txt');
 
-        
+        function normalizeUrl(url) {
+            if (!/^https?:\/\//i.test(url)) {
+                url = "https://" + url;
+            }
+            return url.replace(/\/+$/, "");
+        }
+
         async function fetchModel() {
             const btn = this;
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Fetching...`;
 
-            const apiUrl = document.getElementById("api-url").value.trim();
+            const apiUrl = normalizeUrl(document.getElementById("api-url").value.trim());
             const apiKey = document.getElementById("api-key").value.trim();
             const select = document.getElementById("model-list");
             const modelInput = document.getElementById("model");
