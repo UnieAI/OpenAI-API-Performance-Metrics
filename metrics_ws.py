@@ -336,7 +336,7 @@ class APIThroughputMonitor:
             next_token_time = start_time
             
             # Make request with SSL verification disabled
-            async with httpx.AsyncClient(verify=False, timeout=180.0, proxy=PROXY) as client:
+            async with httpx.AsyncClient(verify=False, timeout=180.0) as client:
                 async with client.stream("POST", f"{self.api_url}/chat/completions", headers=headers, json=payload) as response:
                     # logger.debug(f"RESPONSE STATUS: {response.status_code}")
                     payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", True)
