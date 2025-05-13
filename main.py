@@ -54,10 +54,6 @@ async def get_index():
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await websocket_handler(websocket)
-    
-# @app.on_event("startup")
-# async def startup():
-#     asyncio.create_task(monitor_cleaner())
 
 # Activate FastAPI server
 if __name__ == "__main__":

@@ -487,8 +487,15 @@
 
     <script>
         // WebSocket integration for preview.html frontend
+        let token = localStorage.getItem("client_token");
+        if (!token) {
+            token = crypto.randomUUID();  // 或用自訂的識別碼
+            localStorage.setItem("client_token", token);
+        }
+
         const protocol = location.protocol === "https:" ? "wss" : "ws";
-        const wsUrl = `${protocol}://${location.host}/ws`;
+        const wsUrl = `${protocol}://${location.host}/ws?token=${token}`;
+        // const wsUrl = `${protocol}://${location.host}/ws`;
         let ws;
         const sessions = {};
         
@@ -503,6 +510,13 @@
             const rows = data.sessions;
             console.log(rows)
             const dashboard = data.dashboard;
+
+            if (rows && Object.keys(rows).length > 0) {
+                const placeholder = document.querySelector('#sessions-grid .session-grid-empty');
+                if (placeholder) {
+                    placeholder.remove();
+                }
+            }
         
             Object.entries(rows).forEach(([id, sessionData]) => {
                 let session = sessions[id];
@@ -549,6 +563,7 @@
             // Open Websocket connection
             ws.onopen = () => {
                 addLogEntry('success', 'WebSocket connected');
+                ws.send(JSON.stringify({ command: "rebind" }));
             };
             // Close Websocket connection
             ws.onclose = () => {
@@ -564,7 +579,9 @@
         const messageHandlers = {
             'stats_update': handleStatsUpdateMessage,
             'completed': handleCompletedMessage,
-            'file': handleFileMessage
+            'file': handleFileMessage,
+            'rebound': handleReboundMessage,
+            'no_monitor': handleNoMonitorMessage
         };
 
         function handleMessage(msg) {
@@ -588,6 +605,23 @@
         function handleFileMessage(msg) {
             addLogEntry('success', 'Recieve File.');
             updateFileSection(msg.fileName, msg.fileUrl);
+        }
+        // Handle Rebound message
+        function handleReboundMessage(msg) {
+            addLogEntry('info', 'Rebound to previous monitor.');
+            if (msg.running) {
+                document.getElementById('start-btn').disabled = true;
+                document.getElementById('stop-btn').disabled = false;
+                document.getElementById('status-indicator').className = 'status-indicator status-running';
+            } else {
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('stop-btn').disabled = true;
+                document.getElementById('status-indicator').className = 'status-indicator status-stopped';
+            }
+        }
+        // Handle No_Monitor message
+        function handleNoMonitorMessage(msg) {
+            addLogEntry('info', 'No active monitor to rebind.');
         }
         // Handle unknown message
         function handleUnknownMessage(msg) {
