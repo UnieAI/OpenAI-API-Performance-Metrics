@@ -292,15 +292,15 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="output-dir" class="form-label">Output Directory <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" title="Directory to save request/response files"></i></label>
-                                        <input type="text" class="form-control" id="output-dir" value="output">
+                                        <input type="text" class="form-control" id="output-dir" placeholder="output">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="log-file" class="form-label">Log File <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" title="Path to the log file for monitoring data"></i></label>
-                                        <input type="text" class="form-control" id="log-file" value="api_monitor.jsonl">
+                                        <input type="text" class="form-control" id="log-file" placeholder="api_monitor_<%Y%m%d_%H%M%S>.jsonl">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="plot-file" class="form-label">Chart File <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" title="Path to the plot file for monitoring data"></i></label>
-                                        <input type="text" class="form-control" id="plot-file" value="api_metrics.png">
+                                        <input type="text" class="form-control" id="plot-file" placeholder="api_metrics_<%Y%m%d_%H%M%S>.png">
                                     </div>
                                     <!-- <div class="col-md-6">
                                         <label for="console-log-level" class="form-label">Console Log Level <i class="bi bi-question-circle help-icon" data-bs-toggle="tooltip" title="Logging level for console output"></i></label>
@@ -1098,9 +1098,9 @@
             // Advanced
             let max_concurrent_input = parseInt(document.getElementById('max-concurrent').value);
             let max_concurrent = Number.isNaN(max_concurrent_input) ? 10 : max_concurrent_input;  // TODO: value check
-            let output_dir = parseInt(document.getElementById('output-dir').value)
-            let log_file = parseInt(document.getElementById('log-file').value)
-            let plot_file = parseInt(document.getElementById('plot-file').value)
+            let output_dir = document.getElementById('output-dir').value
+            let log_file = document.getElementById('log-file').value
+            let plot_file = document.getElementById('plot-file').value
             // Dataset
             let datasets = document.getElementById('dataset-name').value
             let template_type = document.getElementById('template-type').value

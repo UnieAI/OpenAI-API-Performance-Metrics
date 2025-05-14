@@ -184,13 +184,6 @@ class APIThroughputMonitor:
                 "total_chunks": total_chunks
             }
             
-            # await websocket.send_text(json.dumps({
-            #     "status": "stats_update",
-            #     "data": {
-            #         "sessions": sessions_data,
-            #         "dashboard": summary_stats_to_send
-            #     }
-            # }))
             await safe_send(websocket, {"status": "stats_update", "data": {
                     "sessions": sessions_data,
                     "dashboard": summary_stats_to_send
@@ -338,7 +331,6 @@ class APIThroughputMonitor:
             # Make request with SSL verification disabled
             async with httpx.AsyncClient(verify=False, timeout=180.0) as client:
                 async with client.stream("POST", f"{self.api_url}/chat/completions", headers=headers, json=payload) as response:
-                    # logger.debug(f"RESPONSE STATUS: {response.status_code}")
                     payload_record = FileHandler(f"{self.output_dir}/in_{runtime_uuid}_{session_id}.json", "w", True)
                     output_record = FileHandler(f"{self.output_dir}/out_{runtime_uuid}_{session_id}.json", "w", True)
 
@@ -347,7 +339,6 @@ class APIThroughputMonitor:
 
                     async for line in response.aiter_lines():
                         if line:
-                            # logger.info(f"Line: {line}")
                             data = self.process_stream_info(line)
                             if data is None:
                                 break
@@ -442,13 +433,6 @@ class APIThroughputMonitor:
                 }
                 await safe_send(self.websocket, file_info, monitor=self)
                 logger.info(f"📦 Log file info sent to frontend.")
-                # try:
-                #     # await self.websocket.send_text(json.dumps(file_info))
-                #     await safe_send(self.websocket, {file_info}, monitor=self)
-                #     logger.info(f"📦 Log file info sent to frontend.")
-                # except Exception as e:
-                #     logger.info(f"Frontend doesn't connect to websocket, file pending.")
-                #     # self.pending_messages.append(file_info)
                 # Generate charts
                 try:
                     log_file_path = Path(self.output_dir, self.log_file).resolve()
@@ -462,13 +446,6 @@ class APIThroughputMonitor:
                     }
                     await safe_send(self.websocket, plot_info, monitor=self)
                     logger.info("📈 Visualization generated successfully.")
-                    # try:
-                    #     # await self.websocket.send_text(json.dumps(plot_info))
-                    #     await safe_send(self.websocket, {plot_info}, monitor=self)
-                    #     logger.info("📈 Visualization generated successfully.")
-                    # except Exception as e:
-                    #     logger.info(f"Frontend doesn't connect to websocket, file pending.")
-                    #     # self.pending_messages.append(plot_info)
                 except Exception as e:
                     logger.error(f"❌ Failed to generate visualization: {e}")
                 # Clean up states
@@ -546,7 +523,6 @@ async def websocket_handler(websocket: WebSocket):
             if data.get("command") == "start":
                 runtime_uuid = str(uuid.uuid4()).replace("-", "")
                 if monitor and monitor.running:
-                    # await websocket.send_text(json.dumps({"status": "error", "message": "Monitor already running"}))
                     await safe_send(websocket, {"status": "error", "message": "Monitor already running"}, monitor=monitor)
                     logger.info(f"Monitor already running: {monitor.sessions}")
                 else:
@@ -554,19 +530,25 @@ async def websocket_handler(websocket: WebSocket):
                     model = params.get('model', os.getenv('MODEL', 'gpt-3.5-turbo'))
                     api_url = normalize_url(params.get('api_url', os.environ.get('API_URL')))
                     api_key = params.get('api_key', os.environ.get('OPENAI_API_KEY'))
+                    time_limit = int(params.get('time_limit', 10))
                     max_concurrent = int(params.get('max_concurrent', 5))
                     columns = int(params.get('columns', 3))
+                    # Result File
+                    def get_value_or_default(value: str | None, default: str) -> str:
+                        logger.info(f"file: {value}")
+                        if value is None or value.strip() == "":
+                            return default
+                        return value
+                                                         
                     taipei_time = datetime.now(ZoneInfo("Asia/Taipei"))
                     current_time = taipei_time.strftime("%Y%m%d_%H%M%S")
-                    log_file = f"api_monitor_{current_time}.jsonl"
-                    plot_file = f"api_metrics_{current_time}.png"
-                    time_limit = int(params.get('time_limit', 10))
+                    output_dir = get_value_or_default(params.get("output_dir"), LOG_FILE_DIR)    # Load it from environment variables
+                    log_file = get_value_or_default(params.get("log_file"), f"api_monitor_{current_time}.jsonl")
+                    plot_file = get_value_or_default(params.get("plot_file"), f"api_metrics_{current_time}.png")
+                    # Datasets
                     dataset_name = params.get('dataset', "tatsu-lab/alpaca") # Dangours, use with caution
                     template_str = params.get('template')
                     conversation_str = params.get('conversation')
-
-                    # Load it from environment variables
-                    output_dir = LOG_FILE_DIR
 
                     # Create directories if needed
                     if output_dir and not os.path.exists(output_dir):
@@ -585,7 +567,6 @@ async def websocket_handler(websocket: WebSocket):
                             elif conversation_str is not None and conversation_str != "":
                                 questions = load_dataset_as_questions(dataset_name, Conversation(conversation_str))
                             else:
-                                # await websocket.send_text(json.dumps({"status": "error", "message": "Either template or conversation must be provided"}))
                                 await safe_send(websocket, {"status": "error", "message": "Either template or conversation must be provided"}, monitor=monitor)
                                 return
 
@@ -603,15 +584,13 @@ async def websocket_handler(websocket: WebSocket):
                             # Start the monitor
                             logger.info("🚀 Starting API Throughput Monitor...")
                             try:
-                                # await websocket.send_text(json.dumps({"status": "started", "message": "Monitor started"}))
                                 await safe_send(websocket, {"status": "started", "message": "Monitor started"}, monitor=monitor)
                             except Exception:
                                 logger.warning("⚠️ Cannot notify frontend, websocket disconnected before start.")
                             await monitor.run(websocket, duration=time_limit)
                         except Exception as e:
                             logger.exception(f"❌ Monitor run failed during startup or execution: {e}")
-                            # Run the monitor in the background
-                            # monitor_task = asyncio.create_task(monitor.run(websocket, duration=time_limit))
+                # Run the monitor in the background
                 monitor_task = asyncio.create_task(start_monitor())
             elif data.get("command") == "stop":
                 if monitor and monitor.running:
@@ -626,27 +605,19 @@ async def websocket_handler(websocket: WebSocket):
                     monitor = None
                     monitor_task = None
                     count_id = 0
-                    # await websocket.send_text(json.dumps({"status": "stopping", "message": "Monitor stopping"}))
                     await safe_send(websocket, {"status": "stopping", "message": "Monitor stopping"}, monitor=monitor)
 
                 else:
-                    # await websocket.send_text(json.dumps({"status": "error", "message": "No monitor running"}))
                     await safe_send(websocket, {"status": "error", "message": "No monitor running"}, monitor=monitor)
             elif data.get("command") == "rebind":
                 if monitor:
                     monitor.websocket = websocket
-                    # await websocket.send_text(json.dumps({
-                    #     "status": "rebound",
-                    #     "message": "WebSocket rebound to monitor",
-                    #     "running": monitor.running
-                    # }))
                     await safe_send(websocket, {"status": "rebound", "message": "WebSocket rebound to monitor", "running": monitor.running}, monitor=monitor)
                     logger.info(f"🔁 WebSocket rebound from client {client_ip}:{client_port}")
 
                     # 補發未送出的訊息
                     for msg in monitor.pending_messages:
                         try:
-                            # await websocket.send_text(json.dumps(msg))
                             await safe_send(websocket, msg, monitor=monitor)
                             logger.info(f"📤 Resent pending message: {msg}")
                         except Exception as e:
@@ -655,10 +626,6 @@ async def websocket_handler(websocket: WebSocket):
                     # 清空已發送的訊息
                     monitor.pending_messages.clear()
                 else:
-                    # await websocket.send_text(json.dumps({
-                    #     "status": "no_monitor",
-                    #     "message": "No active monitor to rebind"
-                    # }))
                     await safe_send(websocket, {"status": "no_monitor", "message": "No active monitor to rebind"}, monitor=monitor)
 
 
@@ -693,7 +660,6 @@ async def monitor_cleaner():
                             "status": "completed",
                             "message": "Benchmark run finished"
                         }
-                        # await websocket.send_text(json.dumps(completion_message))
                         await safe_send(websocket, completion_message, monitor=monitor)
                         logger.info(f"📡 Sent completion message to {client_ip}:{client_port}")
                     except Exception as e:
