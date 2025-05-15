@@ -535,7 +535,6 @@ async def websocket_handler(websocket: WebSocket):
                     columns = int(params.get('columns', 3))
                     # Result File
                     def get_value_or_default(value: str | None, default: str) -> str:
-                        logger.info(f"file: {value}")
                         if value is None or value.strip() == "":
                             return default
                         return value
@@ -549,6 +548,11 @@ async def websocket_handler(websocket: WebSocket):
                     dataset_name = params.get('dataset', "tatsu-lab/alpaca") # Dangours, use with caution
                     template_str = params.get('template')
                     conversation_str = params.get('conversation')
+                    # log level 
+                    console_log_level=params.get("console_log_level")
+                    file_log_level=params.get("file_log_level")
+                    setup_logger(__name__, console_log_level, file_log_level)
+                    logger.info(f"Log level updated via websocket command: CLL: {console_log_level}, FLL: {file_log_level}")
 
                     # Create directories if needed
                     if output_dir and not os.path.exists(output_dir):
@@ -627,7 +631,6 @@ async def websocket_handler(websocket: WebSocket):
                     monitor.pending_messages.clear()
                 else:
                     await safe_send(websocket, {"status": "no_monitor", "message": "No active monitor to rebind"}, monitor=monitor)
-
 
     except WebSocketDisconnect:
         logger.info(f"Client disconnected: {client_ip}:{client_port}")
