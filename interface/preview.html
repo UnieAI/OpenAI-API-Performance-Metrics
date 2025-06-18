@@ -533,6 +533,7 @@
                 session.status = sessionData.status;
                 session.chars = sessionData.total_chars;
                 session.chunks = sessionData.chunks_received;
+                // session.firstTokenLatency = sessionData.first_token_latency;
 
                 if(session.stopped){
                     return
@@ -795,6 +796,7 @@
             this.promptTokens = 0;
             this.sessionCard = this.createCard();
             this.firstChunkTime = null;
+            // this.firstTokenLatency = 0;
             this.endTime = null;
             this.rawChunks = [];            // store each chunk's raw data line
             this.finalResult = '';
@@ -826,28 +828,33 @@
             const sessionBody = document.createElement('div');
             sessionBody.className = 'session-body';
 
-            // Row 1: Response Time + Chars
-            const row1 = document.createElement('div'); row1.className = 'row mb-2';
-            const col1 = document.createElement('div'); col1.className = 'col-6';
-            const responseTime = document.createElement('strong'); responseTime.textContent = 'Response Time: ';
-            const responseTimeValue = document.createElement('span');
-            col1.appendChild(responseTime); col1.appendChild(responseTimeValue);
-            const col2 = document.createElement('div'); col2.className = 'col-6';
-            const chars = document.createElement('strong'); chars.textContent = 'Chars: ';
-            const charsValue = document.createElement("span"); charsValue.textContent = '0';
-            col2.appendChild(chars); col2.appendChild(charsValue);
-            row1.appendChild(col1); row1.appendChild(col2);
+            const createInfoRow = (labelText, valueClass) => {
+                const row = document.createElement('div');
+                row.className = 'row mb-1';
+                const col = document.createElement('div');
+                col.className = 'col-12';
+                const label = document.createElement('strong');
+                label.textContent = labelText;
+                const value = document.createElement('span');
+                value.className = valueClass;
+                value.textContent = '0';
+                col.appendChild(label);
+                col.appendChild(value);
+                row.appendChild(col);
+                return { row, value };
+            };
 
-            // Row 2: Chunks
-            const row2 = document.createElement('div'); row2.className = 'row';
-            const col3 = document.createElement('div'); col3.className = 'col-12';
-            const chunks = document.createElement('strong'); chunks.textContent = 'Chunks: ';
-            const chunksValue = document.createElement("span"); chunksValue.textContent = '0';
-            col3.appendChild(chunks); col3.appendChild(chunksValue);
-            row2.appendChild(col3);
+            // 各個 row 建立
+            const { row: responseTimeRow, value: responseTimeValue } = createInfoRow('Response Time: ', 'response-time');
+            const { row: charsRow, value: charsValue } = createInfoRow('Chars: ', 'chars');
+            const { row: chunksRow, value: chunksValue } = createInfoRow('Chunks: ', 'chunks');
+            // const { row: firstLatencyRow, value: firstLatencyValue } = createInfoRow('First Token Latency: ', 'first-token-latency');
 
-            // Add to session body
-            sessionBody.appendChild(row1); sessionBody.appendChild(row2);
+            // 加入到 sessionBody
+            sessionBody.appendChild(responseTimeRow);
+            sessionBody.appendChild(charsRow);
+            sessionBody.appendChild(chunksRow);
+            // sessionBody.appendChild(firstLatencyRow);
 
             // Session Footer
             const sessionFooter = document.createElement('div');
@@ -867,6 +874,7 @@
                 chunks: chunksValue,
                 chars: charsValue,
                 time: responseTimeValue,
+                // firstLatency: firstLatencyValue,
                 status: sessionStatus,
                 footer: footerText,
             };
@@ -881,6 +889,7 @@
             this.sessionCard.status.textContent = this.status;
             this.sessionCard.status.className = `session-status ${statusClasses[this.status]}`;
             this.sessionCard.time.textContent = `${elapsed_time.toFixed(2)}s`;
+            // this.sessionCard.firstLatency.textContent = this.firstTokenLatency;
             this.sessionCard.footer.textContent = `Updated ${new Date().toLocaleTimeString()}`;
         };
 

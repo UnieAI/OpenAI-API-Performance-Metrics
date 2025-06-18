@@ -116,7 +116,8 @@ class APIThroughputMonitor:
             f"[{status_style}]{info['status']:10}[/{status_style}] | "
             f"Time: {info['response_time'] or '-':8} | "
             f"Chars: {info['total_chars']:5} | "
-            f"Chunks: {info['chunks_received']:3}"
+            f"Chunks: {info['chunks_received']:3} | "
+            f"First Token Latency: {info['first_token_latency']:3} | "
         )
         
     async def generate_status_table(self, websocket):
@@ -318,7 +319,7 @@ class APIThroughputMonitor:
                     "start_time": time.time(),
                     "response_time": None,
                     "error": None,
-                    "total_chars": 0,
+                    "total_chars": 0,                   # Volecity = total_chars / (response_time - start_time - first_token_latency)
                     "chunks_received": 0,
                     "tokens_latency": [],
                     "tokens_amount": [],
